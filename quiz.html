@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="quiz-container">
+    
+    <!-- STATE 1: CONFIGURATION -->
+    <div id="quizStateConfig" class="quiz-state-view">
+        <div class="quiz-hero">
+            <h3>📝 Personalized Quiz Generator</h3>
+            <p>Our smart Gemini AI will instantly construct a custom 5 multiple-choice questions (MCQs) exam based on your class and choices.</p>
+        </div>
+
+        <div class="quiz-setup-card">
+            <div class="setup-section">
+                <h4>1. Choose Subject:</h4>
+                <div class="setup-list">
+                    <label class="setup-item active">
+                        <input type="radio" name="quizSubject" value="Math" checked onclick="updateQuizSetupUI(this)">
+                        <span class="item-icon">🧮</span>
+                        <span class="item-text">Mathematics</span>
+                    </label>
+                    <label class="setup-item">
+                        <input type="radio" name="quizSubject" value="Science" onclick="updateQuizSetupUI(this)">
+                        <span class="item-icon">🔬</span>
+                        <span class="item-text">Science & Tech</span>
+                    </label>
+                    <label class="setup-item">
+                        <input type="radio" name="quizSubject" value="English" onclick="updateQuizSetupUI(this)">
+                        <span class="item-icon">📖</span>
+                        <span class="item-text">English Grammar</span>
+                    </label>
+                    <label class="setup-item">
+                        <input type="radio" name="quizSubject" value="Social" onclick="updateQuizSetupUI(this)">
+                        <span class="item-icon">🌍</span>
+                        <span class="item-text">Social Studies</span>
+                    </label>
+                    <label class="setup-item">
+                        <input type="radio" name="quizSubject" value="Computer" onclick="updateQuizSetupUI(this)">
+                        <span class="item-icon">💻</span>
+                        <span class="item-text">Computer Literacy</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setup-section mt-4">
+                <h4>2. Select Difficulty Level:</h4>
+                <div class="difficulty-row">
+                    <button class="diff-btn active" onclick="selectDifficulty(this, 'Easy')">Easy</button>
+                    <button class="diff-btn" onclick="selectDifficulty(this, 'Medium')">Medium</button>
+                    <button class="diff-btn" onclick="selectDifficulty(this, 'Hard')">Hard</button>
+                </div>
+            </div>
+
+            <button onclick="startQuizGeneration()" class="btn-primary-glow w-100 mt-5">
+                <span id="quizGenBtnText">Generate 5 MCQ Quiz 🚀</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- STATE 2: LOADING -->
+    <div id="quizStateLoading" class="quiz-state-view" style="display: none;">
+        <div class="quiz-loading-box">
+            <div class="spinner-orbit">
+                <i class="fa-solid fa-circle-notch fa-spin"></i>
+            </div>
+            <h3 id="quizLoadingTitle">Gemini AI is generating your Quiz...</h3>
+            <p id="quizLoadingSubtitle">Evaluating standard parameters for Class {{ session.get('class_level') }}...</p>
+        </div>
+    </div>
+
+    <!-- STATE 3: ACTIVE PLAY -->
+    <div id="quizStateActive" class="quiz-state-view" style="display: none;">
+        <div class="quiz-progress-row">
+            <span class="q-progress-text" id="quizProgressText">Question 1 of 5</span>
+            <span class="q-score-text" id="quizRunningScore">Score: 0/5</span>
+        </div>
+        <div class="progress-bar-outer mt-2">
+            <div class="progress-bar-inner purple" id="quizProgressBar" style="width: 20%;"></div>
+        </div>
+
+        <div class="quiz-question-card mt-4">
+            <p class="question-text" id="questionText">What is the capital of India?</p>
+        </div>
+
+        <div class="options-container mt-4" id="optionsContainer">
+            <!-- Dynamic option rows inserted here -->
+        </div>
+
+        <!-- Correct/Incorrect Explanation Panel (Initially Hidden) -->
+        <div class="explanation-panel mt-4 border-glow" id="explanationPanel" style="display: none;">
+            <div class="explanation-header">
+                <i class="fa-solid fa-lightbulb"></i>
+                <span>AI Study Insight</span>
+            </div>
+            <p class="explanation-desc" id="explanationDesc">New Delhi became the capital of India in 1911...</p>
+            <button onclick="nextQuestion()" class="btn-primary mt-4 w-100" id="nextQuestionBtn">
+                <span>Next Question <i class="fa-solid fa-arrow-right"></i></span>
+            </button>
+        </div>
+    </div>
+
+    <!-- STATE 4: RESULT SUMMARY -->
+    <div id="quizStateResult" class="quiz-state-view" style="display: none;">
+        <div class="result-card">
+            <div class="result-score-circle" id="resultCircle">
+                <span class="score-fraction" id="resultScoreFraction">4 / 5</span>
+                <span class="score-percentage" id="resultScorePercentage">80% Score</span>
+            </div>
+            
+            <h2 class="result-title mt-4" id="resultTitle">Great Job! Well Done! 🌟</h2>
+            <p class="result-desc mt-2" id="resultDesc">You did very well! Keep reviewing and you will score 100% next time.</p>
+
+            <button onclick="resetQuiz()" class="btn-primary-glow w-100 mt-5">
+                <span id="quizRetryText">Try Another Quiz 🔄</span>
+            </button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        initQuizState();
+    });
+</script>
+{% endblock %}

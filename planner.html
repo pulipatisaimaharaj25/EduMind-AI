@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="planner-container">
+    
+    <!-- STATE 1: FORM -->
+    <div id="plannerStateForm" class="planner-state-view">
+        <div class="planner-hero">
+            <h3>📅 AI Day-by-Day Study Planner</h3>
+            <p>Rural students who plan their studies score 40% higher! Enter your exam details below, and let Gemini compile a realistic daily roadmap.</p>
+        </div>
+
+        <div class="planner-setup-card mt-4">
+            <form id="plannerForm" onsubmit="generatePlanner(event)">
+                <div class="form-group">
+                    <label for="examName">What Exam are you preparing for?</label>
+                    <input type="text" id="examName" placeholder="e.g. Science Term 1, Board Finals" required autocomplete="off">
+                </div>
+
+                <div class="form-group mt-3">
+                    <label for="examDate">How many days do you have left?</label>
+                    <input type="text" id="examDate" placeholder="e.g. 5 Days, Next Tuesday" required autocomplete="off">
+                </div>
+
+                <div class="form-group mt-3">
+                    <label>Select Subjects to Study:</label>
+                    <div class="subject-chips-row mt-2">
+                        <div class="subject-chip" onclick="toggleSubjectChip(this, 'Math')">
+                            <span class="chip-emoji">🧮</span> Math
+                        </div>
+                        <div class="subject-chip" onclick="toggleSubjectChip(this, 'Science')">
+                            <span class="chip-emoji">🔬</span> Science
+                        </div>
+                        <div class="subject-chip" onclick="toggleSubjectChip(this, 'English')">
+                            <span class="chip-emoji">📖</span> English
+                        </div>
+                        <div class="subject-chip" onclick="toggleSubjectChip(this, 'Social')">
+                            <span class="chip-emoji">🌍</span> Social
+                        </div>
+                        <div class="subject-chip" onclick="toggleSubjectChip(this, 'Computer')">
+                            <span class="chip-emoji">💻</span> Computer
+                        </div>
+                    </div>
+                </div>
+
+                <div id="plannerFormError" class="form-error-msg mt-3"></div>
+
+                <button type="submit" class="btn-primary-glow w-100 mt-4">
+                    <span id="planGenBtnText">Generate Daily Study Planner 🚀</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- STATE 2: LOADING -->
+    <div id="plannerStateLoading" class="planner-state-view" style="display: none;">
+        <div class="quiz-loading-box">
+            <div class="spinner-orbit">
+                <i class="fa-solid fa-circle-notch fa-spin"></i>
+            </div>
+            <h3 id="plannerLoadingTitle">Creating your day-by-day study schedule...</h3>
+            <p id="plannerLoadingSubtitle">Organized, structured timelines yield excellent marks!</p>
+        </div>
+    </div>
+
+    <!-- STATE 3: ACTIVE CALENDAR PLAN -->
+    <div id="plannerStateActive" class="planner-state-view" style="display: none;">
+        <div class="planner-active-header">
+            <button onclick="backToPlannerForm()" class="btn-back">
+                <i class="fa-solid fa-arrow-left"></i> Create New Plan
+            </button>
+            <span class="active-plan-tag">My Custom Schedule</span>
+        </div>
+
+        <h2 class="active-plan-title mt-4" id="activePlanTitle">Unit Test Preparation</h2>
+        <p class="active-plan-desc mt-1">Check off topics as you finish them. Your progress automatically syncs on-device!</p>
+
+        <!-- Dynamic Day Cards List -->
+        <div class="day-cards-list mt-4" id="dayCardsList">
+            <!-- Dynamic days inserted here -->
+        </div>
+    </div>
+
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        initPlannerState();
+    });
+</script>
+{% endblock %}
