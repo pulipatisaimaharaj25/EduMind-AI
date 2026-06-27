@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduMind AI — Your Personal Study Assistant</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom Style -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        {% if session.get('student_id') %}
+        <!-- Sidebar Navigation (Desktop) / Bottom Navigation (Mobile) -->
+        <nav class="app-navigation">
+            <div class="nav-logo">
+                <div class="logo-icon">🤖</div>
+                <div class="logo-text">EduMind <span>AI</span></div>
+            </div>
+            
+            <div class="nav-links">
+                <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.path == '/dashboard' %}active{% endif %}">
+                    <i class="fa-solid fa-house"></i>
+                    <span>Home</span>
+                </a>
+                <a href="{{ url_for('chat') }}" class="nav-item {% if request.path == '/chat' %}active{% endif %}">
+                    <i class="fa-solid fa-comments"></i>
+                    <span>Doubts Solver</span>
+                </a>
+                <a href="{{ url_for('quiz') }}" class="nav-item {% if request.path == '/quiz' %}active{% endif %}">
+                    <i class="fa-solid fa-trophy"></i>
+                    <span>AI Quizzes</span>
+                </a>
+                <a href="{{ url_for('planner') }}" class="nav-item {% if request.path == '/planner' %}active{% endif %}">
+                    <i class="fa-solid fa-calendar-check"></i>
+                    <span>Study Planner</span>
+                </a>
+            </div>
+
+            <div class="nav-footer">
+                <div class="user-badge">
+                    <div class="user-avatar">{{ session.get('student_name')[0] | upper }}</div>
+                    <div class="user-details">
+                        <div class="user-name">{{ session.get('student_name') }}</div>
+                        <div class="user-class">Class {{ session.get('class_level') }}</div>
+                    </div>
+                </div>
+                <button onclick="resetProfile()" class="btn-reset">
+                    <i class="fa-solid fa-power-off"></i>
+                    <span>Reset Session</span>
+                </button>
+            </div>
+        </nav>
+        {% endif %}
+
+        <!-- Main Content Area -->
+        <main class="main-content {% if not session.get('student_id') %}full-width{% endif %}">
+            <!-- Header Bar -->
+            {% if session.get('student_id') %}
+            <header class="content-header">
+                <div class="header-welcome">
+                    <h2>Namaste, {{ session.get('student_name') }}! 👋</h2>
+                    <p>Let's unlock your potential today.</p>
+                </div>
+                
+                <div class="header-actions">
+                    <button id="langToggleBtn" onclick="toggleLanguage()" class="btn-lang">
+                        <span class="flag-icon">🇮🇳</span>
+                        <span id="langText">తెలుగులో కావాలా?</span>
+                    </button>
+                </div>
+            </header>
+            {% endif %}
+
+            <!-- Specific View Content -->
+            <div class="view-body">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <!-- Common Script -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
