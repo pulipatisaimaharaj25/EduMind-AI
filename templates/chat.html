@@ -1,11 +1,98 @@
 {% extends 'base.html' %}
-
 {% block content %}
+
+<!-- Transformers.js Local AI — Runs 100% in Browser, No API Key! -->
+<script type="module">
+    import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+
+    let localClassifier = null;
+    let localAIReady = false;
+
+    // Load local AI model silently in background
+    async function loadLocalAI() {
+        try {
+            updateLocalAIStatus('loading');
+            localClassifier = await pipeline(
+                'zero-shot-classification',
+                'Xenova/mobilebert-uncased-mnli'
+            );
+            localAIReady = true;
+            updateLocalAIStatus('ready');
+        } catch (err) {
+            console.warn('Local AI load failed:', err);
+            updateLocalAIStatus('error');
+        }
+    }
+
+    // Update the small status badge
+    function updateLocalAIStatus(status) {
+        const badge = document.getElementById('localAIBadge');
+        const badgeText = document.getElementById('localAIText');
+        if (!badge || !badgeText) return;
+
+        if (status === 'loading') {
+            badge.className = 'local-ai-badge loading';
+            badgeText.textContent = '⏳ Local AI Loading...';
+        } else if (status === 'ready') {
+            badge.className = 'local-ai-badge ready';
+            badgeText.textContent = '✅ On-Device AI Ready';
+        } else {
+            badge.className = 'local-ai-badge error';
+            badgeText.textContent = '☁️ Cloud Mode';
+        }
+    }
+
+    // Auto-detect subject from question using local AI
+    async function detectSubjectLocally(questionText) {
+        if (!localAIReady || !localClassifier) return null;
+
+        try {
+            const labels = [
+                'mathematics numbers algebra geometry calculus',
+                'science biology physics chemistry photosynthesis',
+                'english grammar literature writing vocabulary',
+                'social studies history geography civics economics',
+                'computer science programming technology software'
+            ];
+
+            const subjectNames = ['Math', 'Science', 'English', 'Social', 'Computer'];
+
+            const result = await localClassifier(questionText, labels);
+            const topIndex = labels.indexOf(result.labels[0]);
+            const confidence = result.scores[0];
+
+            // Only auto-switch if confidence > 50%
+            if (confidence > 0.5 && topIndex !== -1) {
+                return {
+                    subject: subjectNames[topIndex],
+                    confidence: (confidence * 100).toFixed(0)
+                };
+            }
+            return null;
+        } catch (err) {
+            console.warn('Local classification error:', err);
+            return null;
+        }
+    }
+
+    // Expose functions to global scope for use in script.js
+    window.detectSubjectLocally = detectSubjectLocally;
+    window.isLocalAIReady = () => localAIReady;
+
+    // Start loading local AI immediately
+    loadLocalAI();
+</script>
+
 <div class="chat-container">
     <div class="chat-header-row">
         <div class="chat-title">
             <h3>🤖 AI Doubt Solver</h3>
             <p>Select your subject below, type in any academic question, and get simplified step-by-step guidance!</p>
+        </div>
+
+        <!-- On Device AI Status Badge -->
+        <div id="localAIBadge" class="local-ai-badge loading">
+            <span id="localAIText">⏳ Local AI Loading...</span>
         </div>
     </div>
 
@@ -28,13 +115,19 @@
         </button>
     </div>
 
+    <!-- On Device AI Info Bar -->
+    <div class="ondevice-info-bar" id="ondeviceBar" style="display:none;">
+        <span id="ondeviceBarText"></span>
+        <button onclick="dismissAutoDetect()" class="btn-dismiss">✕</button>
+    </div>
+
     <!-- Chat Messages Scrolling Panel -->
     <div class="chat-messages-box" id="chatMessages">
         <div class="chat-welcome-placeholder" id="chatPlaceholder">
             <div class="placeholder-icon">🤖</div>
             <h3>Ask any doubt in <span id="currentSubLabel">Math</span>!</h3>
             <p class="placeholder-guide">
-                Our advanced Gemini-powered AI explains complex concepts using extremely simple, 
+                Our advanced Gemini-powered AI explains complex concepts using extremely simple,
                 step-by-step lines with context from everyday Indian life.
             </p>
             <div class="example-box">
@@ -44,7 +137,7 @@
         </div>
     </div>
 
-    <!-- Chat Loading Indicator (Hidden initially) -->
+    <!-- Chat Loading Indicator -->
     <div class="chat-loader-row" id="chatLoader" style="display: none;">
         <div class="bubble-ai shadow-glow">
             <div class="loader-content">
@@ -55,7 +148,7 @@
     </div>
 
     <!-- Chat Input Row -->
-    <form class="chat-input-row" onsubmit="submitDoubt(event)">
+    <form class="chat-input-row" onsubmit="submitDoubtWithLocalAI(event)">
         <input type="text" id="chatInput" placeholder="Ask your doubt here..." required autocomplete="off">
         <button type="submit" class="btn-send shadow-glow" id="sendBtn">
             <i class="fa-solid fa-paper-plane"></i>
@@ -63,7 +156,104 @@
     </form>
 </div>
 
+<style>
+/* On Device AI Badge */
+.local-ai-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: 'Poppins', sans-serif;
+    white-space: nowrap;
+}
+.local-ai-badge.loading {
+    background: rgba(234, 179, 8, 0.15);
+    border: 1px solid rgba(234, 179, 8, 0.4);
+    color: #eab308;
+}
+.local-ai-badge.ready {
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid rgba(34, 197, 94, 0.4);
+    color: #22c55e;
+}
+.local-ai-badge.error {
+    background: rgba(124, 58, 237, 0.15);
+    border: 1px solid rgba(124, 58, 237, 0.4);
+    color: #7c3aed;
+}
+
+/* Auto-detect info bar */
+.ondevice-info-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    border-radius: 8px;
+    padding: 8px 14px;
+    margin: 8px 0;
+    font-size: 12px;
+    color: #22c55e;
+    font-family: 'Poppins', sans-serif;
+}
+.btn-dismiss {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 0 4px;
+}
+</style>
+
 <script>
+    // Override submitDoubt to add local AI auto-detection
+    async function submitDoubtWithLocalAI(event) {
+        event.preventDefault();
+
+        const input = document.getElementById('chatInput');
+        const question = input.value.trim();
+        if (!question) return;
+
+        // Try local AI subject detection first
+        if (window.isLocalAIReady && window.isLocalAIReady()) {
+            try {
+                const detected = await window.detectSubjectLocally(question);
+                if (detected) {
+                    // Auto-switch subject pill if detected
+                    const pills = document.querySelectorAll('.subject-pill');
+                    pills.forEach(pill => {
+                        if (pill.textContent.trim().includes(detected.subject)) {
+                            // Simulate click to switch subject
+                            selectSubject(pill, detected.subject);
+
+                            // Show info bar
+                            const bar = document.getElementById('ondeviceBar');
+                            const barText = document.getElementById('ondeviceBarText');
+                            if (bar && barText) {
+                                barText.textContent =
+                                    `🧠 On-Device AI detected subject: ${detected.subject} (${detected.confidence}% confidence) — running locally, no API used!`;
+                                bar.style.display = 'flex';
+                            }
+                        }
+                    });
+                }
+            } catch(e) {
+                console.warn('Auto-detect skipped:', e);
+            }
+        }
+
+        // Now call the original submitDoubt function
+        submitDoubt(event);
+    }
+
+    function dismissAutoDetect() {
+        const bar = document.getElementById('ondeviceBar');
+        if (bar) bar.style.display = 'none';
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         initChat();
     });
