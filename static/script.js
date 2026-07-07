@@ -33,7 +33,6 @@ function toggleLanguage() {
     localStorage.setItem("isTeluguMode", isTeluguMode);
     updateLanguageUI();
     
-    // Dispatch events to refresh specific pages depending on where the user is
     const currentPath = window.location.pathname;
     if (currentPath === "/dashboard") {
         loadDashboardData();
@@ -52,7 +51,6 @@ function toggleLanguage() {
     }
 }
 
-// Ensure language state is visually in sync on page load
 document.addEventListener("DOMContentLoaded", function() {
     updateLanguageUI();
 });
@@ -114,7 +112,6 @@ function resetProfile() {
 // --- Dashboard Logic ---
 
 function loadDashboardData() {
-    // 1. Fetch motivation quote
     const quoteEl = document.getElementById("motivationalQuote");
     if (quoteEl) {
         fetch('/api/quote')
@@ -130,10 +127,7 @@ function loadDashboardData() {
         });
     }
     
-    // 2. Fetch study schedule topic checklist
     loadDashboardSchedule();
-    
-    // 3. Fetch past quiz histories
     loadDashboardQuizHistory();
 }
 
@@ -154,7 +148,6 @@ function loadDashboardSchedule() {
             return;
         }
         
-        // Find the first day with unchecked topics, or default to first day
         let days = data.days || [];
         let todayDay = days.find(d => d.topics && d.topics.some(t => !t.isDone)) || days[0];
         
@@ -189,10 +182,7 @@ function loadDashboardSchedule() {
             `;
         });
         
-        html += `
-                </div>
-            </div>
-        `;
+        html += `</div></div>`;
         container.innerHTML = html;
     })
     .catch(err => {
@@ -206,10 +196,8 @@ function toggleDashboardTopic(dayIndex, topicIndex, currentStatus) {
     .then(res => res.json())
     .then(data => {
         if (!data || !data.days) return;
-        // Invert status
         data.days[dayIndex].topics[topicIndex].isDone = !currentStatus;
         
-        // Save back
         fetch('/api/planner/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -220,11 +208,7 @@ function toggleDashboardTopic(dayIndex, topicIndex, currentStatus) {
                 plan_json: JSON.stringify(data)
             })
         })
-        .then(res => res.json())
-        .then(() => {
-            // Re-render
-            loadDashboardSchedule();
-        });
+        .then(() => { loadDashboardSchedule(); });
     });
 }
 
@@ -290,16 +274,12 @@ function initChat() {
 }
 
 function selectSubject(pill, subjectName) {
-    // Remove active from all subject pills
     document.querySelectorAll(".subject-pill").forEach(el => el.classList.remove("active"));
     pill.classList.add("active");
-    
     currentSubject = subjectName;
     localStorage.setItem("currentSubject", subjectName);
-    
     const label = document.getElementById("currentSubLabel");
     if (label) label.innerText = subjectName;
-    
     updateChatPlaceholder();
 }
 
@@ -311,11 +291,9 @@ function updateChatPlaceholder() {
     if (chatInput) {
         chatInput.placeholder = isTeluguMode ? "ఇక్కడ మీ సందేహాన్ని అడగండి..." : "Ask your doubt here...";
     }
-    
     if (thinking) {
         thinking.innerText = isTeluguMode ? "EduMind AI ఆలోచిస్తోంది..." : "EduMind AI is thinking...";
     }
-    
     if (example) {
         if (isTeluguMode) {
             example.innerText = currentSubject === "Math" ? '"సమబాహు త్రిభుజం వైశాల్య సూత్రం ఏమిటి?"' : 
@@ -329,7 +307,49 @@ function updateChatPlaceholder() {
     }
 }
 
-function submitDoubt(event) {
+// ============================================================
+// ON DEVICE AI — Auto Subject Detection using Transformers.js
+// Runs 100% locally in browser — No API key needed!
+// ============================================================
+
+// Auto-switch subject pill based on local AI detection
+async function autoDetectAndSwitchSubject(questionText) {
+    try {
+        // Check if local AI is ready (set by chat.html module script)
+        if (!window.isLocalAIReady || !window.isLocalAIReady()) return;
+        if (!window.detectSubjectLocally) return;
+
+        const detected = await window.detectSubjectLocally(questionText);
+        if (!detected) return;
+
+        // Find matching pill and click it
+        const pills = document.querySelectorAll(".subject-pill");
+        pills.forEach(pill => {
+            const pillText = pill.textContent.trim();
+            if (pillText.includes(detected.subject)) {
+                // Only switch if different from current
+                if (currentSubject !== detected.subject) {
+                    selectSubject(pill, detected.subject);
+                }
+
+                // Show info bar
+                const bar = document.getElementById("ondeviceBar");
+                const barText = document.getElementById("ondeviceBarText");
+                if (bar && barText) {
+                    barText.textContent = `🧠 On-Device AI detected: ${detected.subject} (${detected.confidence}% confidence) — ran locally, no API used!`;
+                    bar.style.display = "flex";
+                    // Auto hide after 5 seconds
+                    setTimeout(() => { bar.style.display = "none"; }, 5000);
+                }
+            }
+        });
+    } catch(e) {
+        console.warn("Auto subject detect skipped:", e);
+    }
+}
+
+// Main submit function — now with On Device AI detection!
+async function submitDoubt(event) {
     event.preventDefault();
     
     const input = document.getElementById("chatInput");
@@ -341,18 +361,20 @@ function submitDoubt(event) {
     const question = input.value.trim();
     if (!question) return;
     
-    // Hide placeholder if first message
+    // Hide placeholder
     const placeholder = document.getElementById("chatPlaceholder");
     if (placeholder) placeholder.style.display = "none";
     
-    // Clear input
+    // Clear input immediately
     input.value = "";
     
     // Append Student bubble
     appendChatBubble("You", question, true);
-    
-    // Scroll to bottom
     chatBox.scrollTop = chatBox.scrollHeight;
+
+    // === ON DEVICE AI — Auto detect subject locally FIRST ===
+    await autoDetectAndSwitchSubject(question);
+    // ========================================================
     
     // Show AI Loader
     loader.style.display = "flex";
@@ -404,7 +426,6 @@ function appendChatBubble(sender, text, isStudent) {
 // --- Quiz Generative Interaction Flow ---
 
 function initQuizState() {
-    // Sync UI with config values
     const textBtn = document.getElementById("quizGenBtnText");
     if (textBtn) {
         textBtn.innerText = isTeluguMode ? "రైట్, క్విజ్ ప్రారంభించు! 🚀" : "Generate 5 MCQ Quiz 🚀";
@@ -428,7 +449,6 @@ function startQuizGeneration() {
     const subjectRadio = document.querySelector('input[name="quizSubject"]:checked');
     const subject = subjectRadio ? subjectRadio.value : "Math";
     
-    // Switch state to LOADING
     document.getElementById("quizStateConfig").style.display = "none";
     document.getElementById("quizStateLoading").style.display = "flex";
     
@@ -453,7 +473,6 @@ function startQuizGeneration() {
             activeQuizIndex = 0;
             activeQuizScore = 0;
             
-            // Switch state to ACTIVE
             document.getElementById("quizStateLoading").style.display = "none";
             document.getElementById("quizStateActive").style.display = "block";
             
@@ -474,17 +493,14 @@ function renderQuizQuestion() {
     const question = activeQuizQuestions[activeQuizIndex];
     activeQuizSelectedOption = null;
     
-    // Update texts
     document.getElementById("quizProgressText").innerText = `Question ${activeQuizIndex + 1} of ${activeQuizQuestions.length}`;
     document.getElementById("quizRunningScore").innerText = `Score: ${activeQuizScore}/${activeQuizQuestions.length}`;
     
-    // Progress bar percent calculation
     const pct = ((activeQuizIndex + 1) / activeQuizQuestions.length) * 100;
     document.getElementById("quizProgressBar").style.width = `${pct}%`;
     
     document.getElementById("questionText").innerText = question.question;
     
-    // Load options
     const container = document.getElementById("optionsContainer");
     container.innerHTML = "";
     
@@ -496,12 +512,11 @@ function renderQuizQuestion() {
         container.appendChild(div);
     });
     
-    // Hide explanation initially
     document.getElementById("explanationPanel").style.display = "none";
 }
 
 function selectQuizOption(optIdx) {
-    if (activeQuizSelectedOption !== null) return; // Prevent multiple taps
+    if (activeQuizSelectedOption !== null) return;
     activeQuizSelectedOption = optIdx;
     
     const question = activeQuizQuestions[activeQuizIndex];
@@ -509,7 +524,6 @@ function selectQuizOption(optIdx) {
     
     if (isCorrect) activeQuizScore++;
     
-    // Highlight choices
     const rows = document.querySelectorAll(".option-row");
     rows.forEach((row, idx) => {
         row.classList.add("disabled");
@@ -522,7 +536,6 @@ function selectQuizOption(optIdx) {
         }
     });
     
-    // Display explanation card
     const explPanel = document.getElementById("explanationPanel");
     const explDesc = document.getElementById("explanationDesc");
     const nextBtnText = document.getElementById("nextQuestionBtn").querySelector("span");
@@ -548,7 +561,6 @@ function nextQuestion() {
 }
 
 function showQuizResults() {
-    // Save score history back to database
     const subjectRadio = document.querySelector('input[name="quizSubject"]:checked');
     const subject = subjectRadio ? subjectRadio.value : "Math";
     
@@ -562,7 +574,6 @@ function showQuizResults() {
         })
     }).catch(err => console.error("Error saving score history:", err));
     
-    // Switch state to RESULT
     document.getElementById("quizStateActive").style.display = "none";
     document.getElementById("quizStateResult").style.display = "block";
     
@@ -585,7 +596,6 @@ function showQuizResults() {
     if (isPass) {
         circle.style.borderColor = "var(--soft-green)";
         circle.style.background = "radial-gradient(rgba(0, 200, 83, 0.15), transparent)";
-        
         if (activeQuizScore === 5) {
             title.innerText = isTeluguMode ? "అద్భుతం! శభాష్! 🏆" : "Perfect Score! Master! 🏆";
             desc.innerText = "You answered all questions correctly! Your concepts are extremely clear.";
@@ -596,7 +606,6 @@ function showQuizResults() {
     } else {
         circle.style.borderColor = "var(--accent-yellow)";
         circle.style.background = "radial-gradient(rgba(255, 214, 0, 0.15), transparent)";
-        
         title.innerText = isTeluguMode ? "మరలా ప్రయత్నించు! 💪" : "Keep Practicing! Don't Give Up! 💪";
         desc.innerText = "Don't worry, mistakes are part of learning. Solve your doubts in AI Chat and try again!";
     }
@@ -618,7 +627,6 @@ function initPlannerState() {
         planBtn.innerText = isTeluguMode ? "AI తో ప్లాన్ తయారు చెయ్యి 📅" : "Generate Study Planner 🚀";
     }
     
-    // Check if there is already an active plan, if so render it directly
     fetch('/api/planner/latest')
     .then(res => res.json())
     .then(data => {
@@ -662,7 +670,6 @@ function generatePlanner(event) {
     
     if (errorDiv) errorDiv.innerText = "";
     
-    // Switch state to LOADING
     document.getElementById("plannerStateForm").style.display = "none";
     document.getElementById("plannerStateLoading").style.display = "flex";
     
@@ -683,14 +690,12 @@ function generatePlanner(event) {
     .then(res => res.json())
     .then(data => {
         if (data.days && data.days.length > 0) {
-            // Map the simple string list topics to a stateful object: { text, isDone: false }
             data.days.forEach(day => {
                 day.topics = day.topics.map(t => {
                     return typeof t === 'string' ? { text: t, isDone: false } : t;
                 });
             });
             
-            // Save plan to DB
             fetch('/api/planner/save', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -768,11 +773,8 @@ function togglePlannerTopic(dayIdx, topicIdx, currentStatus) {
     .then(res => res.json())
     .then(data => {
         if (!data || !data.days) return;
-        
-        // Update topics
         data.days[dayIdx].topics[topicIdx].isDone = !currentStatus;
         
-        // Save back
         fetch('/api/planner/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -783,10 +785,7 @@ function togglePlannerTopic(dayIdx, topicIdx, currentStatus) {
                 plan_json: JSON.stringify(data)
             })
         })
-        .then(() => {
-            // Re-render
-            renderActivePlanner(data);
-        });
+        .then(() => { renderActivePlanner(data); });
     });
 }
 
@@ -794,8 +793,6 @@ function backToPlannerForm() {
     document.getElementById("plannerStateActive").style.display = "none";
     document.getElementById("plannerStateLoading").style.display = "none";
     document.getElementById("plannerStateForm").style.display = "block";
-    
-    // Clear chips selection state
     document.querySelectorAll(".subject-chip").forEach(c => c.classList.remove("active"));
     selectedPlannerSubjects = [];
 }
