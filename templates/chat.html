@@ -1,95 +1,12 @@
 {% extends 'base.html' %}
 {% block content %}
 
-<!-- Transformers.js Local AI — Runs 100% in Browser, No API Key! -->
-<script type="module">
-    import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
-
-    let localClassifier = null;
-    let localAIReady = false;
-
-    // Load local AI model silently in background
-    async function loadLocalAI() {
-        try {
-            updateLocalAIStatus('loading');
-            localClassifier = await pipeline(
-                'zero-shot-classification',
-                'Xenova/mobilebert-uncased-mnli'
-            );
-            localAIReady = true;
-            updateLocalAIStatus('ready');
-        } catch (err) {
-            console.warn('Local AI load failed:', err);
-            updateLocalAIStatus('error');
-        }
-    }
-
-    // Update the small status badge
-    function updateLocalAIStatus(status) {
-        const badge = document.getElementById('localAIBadge');
-        const badgeText = document.getElementById('localAIText');
-        if (!badge || !badgeText) return;
-
-        if (status === 'loading') {
-            badge.className = 'local-ai-badge loading';
-            badgeText.textContent = '⏳ Local AI Loading...';
-        } else if (status === 'ready') {
-            badge.className = 'local-ai-badge ready';
-            badgeText.textContent = '✅ On-Device AI Ready';
-        } else {
-            badge.className = 'local-ai-badge error';
-            badgeText.textContent = '☁️ Cloud Mode';
-        }
-    }
-
-    // Auto-detect subject from question using local AI
-    async function detectSubjectLocally(questionText) {
-        if (!localAIReady || !localClassifier) return null;
-
-        try {
-            const labels = [
-                'mathematics numbers algebra geometry calculus',
-                'science biology physics chemistry photosynthesis',
-                'english grammar literature writing vocabulary',
-                'social studies history geography civics economics',
-                'computer science programming technology software'
-            ];
-
-            const subjectNames = ['Math', 'Science', 'English', 'Social', 'Computer'];
-
-            const result = await localClassifier(questionText, labels);
-            const topIndex = labels.indexOf(result.labels[0]);
-            const confidence = result.scores[0];
-
-            // Only auto-switch if confidence > 50%
-            if (confidence > 0.5 && topIndex !== -1) {
-                return {
-                    subject: subjectNames[topIndex],
-                    confidence: (confidence * 100).toFixed(0)
-                };
-            }
-            return null;
-        } catch (err) {
-            console.warn('Local classification error:', err);
-            return null;
-        }
-    }
-
-    // Expose functions to global scope for use in script.js
-    window.detectSubjectLocally = detectSubjectLocally;
-    window.isLocalAIReady = () => localAIReady;
-
-    // Start loading local AI immediately
-    loadLocalAI();
-</script>
-
 <div class="chat-container">
     <div class="chat-header-row">
         <div class="chat-title">
             <h3>🤖 AI Doubt Solver</h3>
             <p>Select your subject below, type in any academic question, and get simplified step-by-step guidance!</p>
         </div>
-
         <!-- On Device AI Status Badge -->
         <div id="localAIBadge" class="local-ai-badge loading">
             <span id="localAIText">⏳ Local AI Loading...</span>
@@ -118,7 +35,7 @@
     <!-- On Device AI Info Bar -->
     <div class="ondevice-info-bar" id="ondeviceBar" style="display:none;">
         <span id="ondeviceBarText"></span>
-        <button onclick="dismissAutoDetect()" class="btn-dismiss">✕</button>
+        <button onclick="document.getElementById('ondeviceBar').style.display='none'" class="btn-dismiss">✕</button>
     </div>
 
     <!-- Chat Messages Scrolling Panel -->
@@ -148,7 +65,7 @@
     </div>
 
     <!-- Chat Input Row -->
-    <form class="chat-input-row" onsubmit="submitDoubtWithLocalAI(event)">
+    <form class="chat-input-row" onsubmit="submitDoubt(event)">
         <input type="text" id="chatInput" placeholder="Ask your doubt here..." required autocomplete="off">
         <button type="submit" class="btn-send shadow-glow" id="sendBtn">
             <i class="fa-solid fa-paper-plane"></i>
@@ -157,7 +74,6 @@
 </div>
 
 <style>
-/* On Device AI Badge */
 .local-ai-badge {
     display: inline-flex;
     align-items: center;
@@ -183,8 +99,6 @@
     border: 1px solid rgba(124, 58, 237, 0.4);
     color: #7c3aed;
 }
-
-/* Auto-detect info bar */
 .ondevice-info-bar {
     display: flex;
     align-items: center;
@@ -208,54 +122,92 @@
 }
 </style>
 
+<!-- Transformers.js — Normal script (not module) for global scope access -->
 <script>
-    // Override submitDoubt to add local AI auto-detection
-    async function submitDoubtWithLocalAI(event) {
-        event.preventDefault();
+// Global state for On Device AI
+window.localAIReady = false;
+window.localClassifier = null;
 
-        const input = document.getElementById('chatInput');
-        const question = input.value.trim();
-        if (!question) return;
+function updateLocalAIBadge(status) {
+    const badge = document.getElementById('localAIBadge');
+    const text = document.getElementById('localAIText');
+    if (!badge || !text) return;
+    if (status === 'loading') {
+        badge.className = 'local-ai-badge loading';
+        text.textContent = '⏳ Local AI Loading...';
+    } else if (status === 'ready') {
+        badge.className = 'local-ai-badge ready';
+        text.textContent = '✅ On-Device AI Ready';
+    } else {
+        badge.className = 'local-ai-badge error';
+        text.textContent = '☁️ Cloud Mode';
+    }
+}
 
-        // Try local AI subject detection first
-        if (window.isLocalAIReady && window.isLocalAIReady()) {
-            try {
-                const detected = await window.detectSubjectLocally(question);
-                if (detected) {
-                    // Auto-switch subject pill if detected
-                    const pills = document.querySelectorAll('.subject-pill');
-                    pills.forEach(pill => {
-                        if (pill.textContent.trim().includes(detected.subject)) {
-                            // Simulate click to switch subject
-                            selectSubject(pill, detected.subject);
+// Load Transformers.js dynamically
+async function loadTransformersAndModel() {
+    try {
+        updateLocalAIBadge('loading');
 
-                            // Show info bar
-                            const bar = document.getElementById('ondeviceBar');
-                            const barText = document.getElementById('ondeviceBarText');
-                            if (bar && barText) {
-                                barText.textContent =
-                                    `🧠 On-Device AI detected subject: ${detected.subject} (${detected.confidence}% confidence) — running locally, no API used!`;
-                                bar.style.display = 'flex';
-                            }
-                        }
-                    });
-                }
-            } catch(e) {
-                console.warn('Auto-detect skipped:', e);
-            }
+        // Dynamically import Transformers.js
+        const { pipeline } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+
+        window.localClassifier = await pipeline(
+            'zero-shot-classification',
+            'Xenova/mobilebert-uncased-mnli'
+        );
+
+        window.localAIReady = true;
+        updateLocalAIBadge('ready');
+        console.log('✅ On-Device AI loaded successfully!');
+
+    } catch(err) {
+        console.warn('On-Device AI load failed:', err);
+        window.localAIReady = false;
+        updateLocalAIBadge('error');
+    }
+}
+
+// Global function — detect subject from question locally
+window.detectSubjectLocally = async function(questionText) {
+    if (!window.localAIReady || !window.localClassifier) return null;
+
+    try {
+        const labels = [
+            'mathematics numbers algebra geometry calculus equations',
+            'science biology physics chemistry photosynthesis nature',
+            'english grammar literature writing vocabulary reading',
+            'social studies history geography civics economics politics',
+            'computer science programming technology software internet'
+        ];
+
+        const subjectNames = ['Math', 'Science', 'English', 'Social', 'Computer'];
+
+        const result = await window.localClassifier(questionText, labels);
+        const topIndex = labels.indexOf(result.labels[0]);
+        const confidence = result.scores[0];
+
+        console.log('On-Device detected:', subjectNames[topIndex], 'confidence:', (confidence*100).toFixed(0)+'%');
+
+        if (confidence > 0.45 && topIndex !== -1) {
+            return {
+                subject: subjectNames[topIndex],
+                confidence: (confidence * 100).toFixed(0)
+            };
         }
-
-        // Now call the original submitDoubt function
-        submitDoubt(event);
+        return null;
+    } catch(err) {
+        console.warn('Local classification error:', err);
+        return null;
     }
+};
 
-    function dismissAutoDetect() {
-        const bar = document.getElementById('ondeviceBar');
-        if (bar) bar.style.display = 'none';
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        initChat();
-    });
+// Start loading when page is ready
+document.addEventListener('DOMContentLoaded', function() {
+    initChat();
+    // Load On-Device AI in background
+    loadTransformersAndModel();
+});
 </script>
+
 {% endblock %}
